@@ -9,6 +9,7 @@ function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [user, setUser] = useState(null)
   const [activeTab, setActiveTab] = useState('query')
+  const [activeCategory, setActiveCategory] = useState('compliance')
 
   const handleLogin = (userData) => {
     setUser(userData)
@@ -21,16 +22,28 @@ function App() {
     setActiveTab('query')
   }
 
+  const mainTabs = [
+    { id: 'query', label: 'Query' },
+    { id: 'dashboard', label: 'Dashboard' },
+    { id: 'alerts', label: 'Smart Alerts' }
+  ]
+
+  const categories = [
+    { id: 'compliance', label: 'Compliance' },
+    { id: 'security', label: 'Security' },
+    { id: 'risk', label: 'Risk' }
+  ]
+
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard':
         return <Dashboard />
       case 'query':
-        return <QueryInterface />
+        return <QueryInterface category={activeCategory} />
       case 'alerts':
         return <Alerts />
       default:
-        return <QueryInterface />
+        return <QueryInterface category={activeCategory} />
     }
   }
 
@@ -41,37 +54,60 @@ function App() {
 
   return (
     <div className="app-container">
-      <div className="tab-navigation">
-        <div className="nav-left">
-          <button
-            className={`tab-button ${activeTab === 'dashboard' ? 'active' : ''}`}
-            onClick={() => setActiveTab('dashboard')}
-          >
-            Dashboard
-          </button>
-          <button
-            className={`tab-button ${activeTab === 'query' ? 'active' : ''}`}
-            onClick={() => setActiveTab('query')}
-          >
-            Query with Natural Language
-          </button>
-          <button
-            className={`tab-button ${activeTab === 'alerts' ? 'active' : ''}`}
-            onClick={() => setActiveTab('alerts')}
-          >
-            Alerts
-          </button>
+      {/* Top Header with Logo and Main Navigation */}
+      <header className="app-header">
+        <div className="header-content">
+          <div className="logo">
+            <span className="logo-text">deriv</span>
+          </div>
+          
+          <nav className="main-nav">
+            {mainTabs.map((tab) => (
+              <button
+                key={tab.id}
+                className={`nav-tab ${activeTab === tab.id ? 'active' : ''}`}
+                onClick={() => setActiveTab(tab.id)}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </nav>
+
+          <div className="header-right">
+            <span className="user-email">{user?.email}</span>
+            <button className="logout-btn" onClick={handleLogout}>
+              Logout
+            </button>
+          </div>
         </div>
-        <div className="nav-right">
-          <span className="user-email">{user?.email}</span>
-          <button className="logout-button" onClick={handleLogout}>
-            Logout
-          </button>
+      </header>
+
+      {/* Sub-navigation for categories (only shown on Query tab) */}
+      {activeTab === 'query' && (
+        <div className="sub-nav">
+          <div className="breadcrumb">
+            <span>Home</span>
+            <span className="separator">›</span>
+            <span className="current">Query Interface</span>
+          </div>
+          <div className="category-tabs">
+            {categories.map((cat) => (
+              <button
+                key={cat.id}
+                className={`category-tab ${activeCategory === cat.id ? 'active' : ''}`}
+                onClick={() => setActiveCategory(cat.id)}
+              >
+                {cat.label}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
-      <div className="tab-content">
+      )}
+
+      {/* Main Content */}
+      <main className="main-content">
         {renderContent()}
-      </div>
+      </main>
     </div>
   )
 }

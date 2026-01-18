@@ -1,108 +1,145 @@
 import { useState } from 'react'
 import './QueryInterface.css'
 
-function QueryInterface() {
+function QueryInterface({ category = 'compliance' }) {
   const [messages, setMessages] = useState([])
   const [inputValue, setInputValue] = useState('')
-  const [promptTabs, setPromptTabs] = useState([])
   const [isLoading, setIsLoading] = useState(false)
-  const [activePromptTab, setActivePromptTab] = useState(null)
   const [graphData, setGraphData] = useState(null)
-  const [isGraphMinimized, setIsGraphMinimized] = useState(false)
-  const [activeCategory, setActiveCategory] = useState('security')
+  const [showGraphModal, setShowGraphModal] = useState(false)
+  const [savedGraphs, setSavedGraphs] = useState([])
+  const [showSaveModal, setShowSaveModal] = useState(false)
+  const [dashboardName, setDashboardName] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
 
-  // Category tabs configuration
-  const categories = [
-    { id: 'security', name: 'Security', icon: '🔒' },
-    { id: 'compliance', name: 'Compliance', icon: '✓' },
-    { id: 'risk', name: 'Risk', icon: '⚠️' }
-  ]
-
-  // Categorized suggested questions
-  const categorizedQuestions = {
-    security: [
-      "What are the recent security incidents?",
-      "Show unauthorized access attempts",
-      "Analyze vulnerability scan results",
-      "Check password policy compliance",
-      "Review multi-factor authentication status",
-      "Identify high-risk user accounts"
-    ],
+  // Category-based suggested queries
+  const categorizedQueries = {
     compliance: [
       "Show regulatory compliance status",
-      "What are the pending audit items?",
-      "Review data privacy compliance",
-      "Check license compliance across teams",
-      "Analyze policy adherence rates",
-      "Show certification expiry dates"
+      "Pending audit items",
+      "Data privacy compliance report",
+      "License compliance across teams",
+      "Policy adherence rates",
+      "Certification expiry dates",
+      "KYC verification status"
+    ],
+    security: [
+      "Recent security incidents",
+      "Unauthorized access attempts",
+      "Vulnerability scan results",
+      "Password policy compliance",
+      "Multi-factor authentication status",
+      "High-risk user accounts",
+      "Firewall breach attempts"
     ],
     risk: [
-      "What are the top risk indicators?",
-      "Show operational risk assessment",
-      "Analyze business continuity metrics",
-      "Review third-party risk scores",
-      "Identify critical system vulnerabilities",
-      "Show incident impact analysis"
+      "Top risk indicators",
+      "Operational risk assessment",
+      "Business continuity metrics",
+      "Third-party risk scores",
+      "Critical system vulnerabilities",
+      "Incident impact analysis",
+      "Market exposure report"
     ]
   }
 
-  // Get current category questions
-  const currentQuestions = categorizedQuestions[activeCategory] || []
+  const suggestedQueries = categorizedQueries[category] || categorizedQueries.compliance
 
-  const parsePrompts = (responseString) => {
-    // Split by colons and filter out empty strings
-    const prompts = responseString.split(':').filter(prompt => prompt.trim() !== '')
-    return prompts
+  const generateMockGraphData = (query) => {
+    const mockDataSets = {
+      revenue: {
+        labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+        values: [65000, 72000, 80000, 85000, 78000, 92000]
+      },
+      transactions: {
+        labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+        values: [120, 145, 132, 167, 189, 98, 76]
+      },
+      users: {
+        labels: ['User A', 'User B', 'User C', 'User D', 'User E'],
+        values: [45000, 38000, 32000, 28000, 25000]
+      },
+      risk: {
+        labels: ['Low', 'Medium', 'High', 'Critical'],
+        values: [65, 25, 8, 2]
+      },
+      countries: {
+        labels: ['UAE', 'Saudi', 'Qatar', 'Bahrain', 'Kuwait'],
+        values: [340, 280, 150, 120, 95]
+      }
+    }
+
+    const queryLower = query.toLowerCase()
+    if (queryLower.includes('transaction') || queryLower.includes('volume')) {
+      return mockDataSets.transactions
+    } else if (queryLower.includes('user') || queryLower.includes('top')) {
+      return mockDataSets.users
+    } else if (queryLower.includes('risk') || queryLower.includes('flag')) {
+      return mockDataSets.risk
+    } else if (queryLower.includes('country') || queryLower.includes('region')) {
+      return mockDataSets.countries
+    }
+    return mockDataSets.revenue
   }
 
   const sendQuery = async (query) => {
     if (!query.trim()) return
 
-    // Add user message to chat
     const userMessage = { role: 'user', content: query }
     setMessages(prev => [...prev, userMessage])
     setInputValue('')
     setIsLoading(true)
 
     try {
-      // DEMO MODE: For testing purposes, using mock data
-      // TODO: Replace with your actual API endpoint
-      const useDemoMode = true // Set to false when using real API
+      const useDemoMode = true
 
       let data
       if (useDemoMode) {
-        // Simulate API delay
         await new Promise(resolve => setTimeout(resolve, 1000))
+        
+        const queryLower = query.toLowerCase()
+        const isFinalQuery = queryLower.includes('show') || 
+                            queryLower.includes('display') || 
+                            queryLower.includes('graph') ||
+                            queryLower.includes('yes') ||
+                            queryLower.includes('confirm')
 
-        // Mock response with prompt_questions
-        data = {
-          prompt_questions: "What is the monthly revenue trend?:Which products are most profitable?:Show customer acquisition costs:Compare regional performance"
+        if (isFinalQuery) {
+          data = {
+            questions: "Here are the results for your query.",
+            is_final: true,
+            graph_data: generateMockGraphData(query),
+            graph_type: 'bar'
+          }
+        } else {
+          data = {
+            questions: "I found some relevant data. Would you like to:\n\n• View detailed breakdown\n• See trend analysis\n• Show comparison report\n\nPlease specify which analysis you'd like to see.",
+            is_final: false
+          }
         }
       } else {
         const response = await fetch('YOUR_API_ENDPOINT', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ query }),
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query, category }),
         })
         data = await response.json()
       }
 
-      // Expecting API to return { prompt_questions: "ques1:ques2:ques3" }
-      const promptQuestions = data.prompt_questions || ''
-
-      // Add assistant message to chat
       const assistantMessage = {
         role: 'assistant',
-        content: 'Here are some related questions you can explore:'
+        content: data.questions || 'Query processed.'
       }
       setMessages(prev => [...prev, assistantMessage])
 
-      // Parse the prompt_questions to create prompt tabs
-      const prompts = parsePrompts(promptQuestions)
-      if (prompts.length > 0) {
-        setPromptTabs(prompts)
+      if (data.is_final === true) {
+        setGraphData({
+          id: Date.now(),
+          query: query,
+          data: data.graph_data || generateMockGraphData(query),
+          type: data.graph_type || 'bar'
+        })
+        setShowGraphModal(true)
       }
     } catch (error) {
       console.error('Error calling API:', error)
@@ -116,266 +153,304 @@ function QueryInterface() {
     }
   }
 
-  const fetchGraphData = async (question) => {
-    setIsLoading(true)
-    try {
-      // DEMO MODE: For testing purposes, using mock data
-      // TODO: Replace with your actual API endpoint for graph data
-      const useDemoMode = true // Set to false when using real API
-
-      let data
-      if (useDemoMode) {
-        // Simulate API delay
-        await new Promise(resolve => setTimeout(resolve, 800))
-
-        // Generate different mock data based on question
-        data = {
-          graph_data: generateMockGraphData(question),
-          graph_type: 'bar'
-        }
-      } else {
-        const response = await fetch('YOUR_GRAPH_API_ENDPOINT', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ question }),
-        })
-        data = await response.json()
-      }
-
-      setGraphData({
-        question: question,
-        data: data.graph_data || generateMockGraphData(question),
-        type: data.graph_type || 'bar'
-      })
-    } catch (error) {
-      console.error('Error fetching graph data:', error)
-      setGraphData({
-        question: question,
-        data: generateMockGraphData(question),
-        type: 'bar'
-      })
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const generateMockGraphData = (question) => {
-    // Generate varied mock data for demonstration based on question
-    const mockDataSets = {
-      revenue: {
-        labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-        values: [65000, 72000, 80000, 85000, 78000, 92000]
-      },
-      products: {
-        labels: ['Product A', 'Product B', 'Product C', 'Product D', 'Product E'],
-        values: [45, 67, 89, 52, 78]
-      },
-      costs: {
-        labels: ['Q1', 'Q2', 'Q3', 'Q4'],
-        values: [1200, 980, 1100, 890]
-      },
-      performance: {
-        labels: ['North', 'South', 'East', 'West', 'Central'],
-        values: [85, 92, 78, 88, 95]
-      }
-    }
-
-    // Select data based on keywords in question
-    const questionLower = question.toLowerCase()
-    if (questionLower.includes('revenue') || questionLower.includes('trend')) {
-      return mockDataSets.revenue
-    } else if (questionLower.includes('product')) {
-      return mockDataSets.products
-    } else if (questionLower.includes('cost')) {
-      return mockDataSets.costs
-    } else if (questionLower.includes('regional') || questionLower.includes('performance')) {
-      return mockDataSets.performance
-    }
-
-    // Default data
-    return {
-      labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-      values: [65, 59, 80, 81, 56, 55]
-    }
-  }
-
-  const handleAddToDashboard = () => {
-    // TODO: Implement add to dashboard functionality
-    alert(`Graph for "${graphData?.question}" will be added to dashboard`)
-  }
-
   const handleSubmit = (e) => {
     e.preventDefault()
     sendQuery(inputValue)
   }
 
-  const handlePromptTabClick = (prompt, index) => {
-    // Set the active tab and fetch graph data
-    setActivePromptTab(index)
-    setIsGraphMinimized(false)
-    fetchGraphData(prompt)
+  const handleAddToDashboard = () => {
+    if (graphData) {
+      setSavedGraphs(prev => [...prev, { ...graphData, id: Date.now() }])
+      setShowGraphModal(false)
+    }
   }
+
+  const handleRemoveGraph = (graphId) => {
+    setSavedGraphs(prev => prev.filter(g => g.id !== graphId))
+  }
+
+  const closeModal = () => {
+    setShowGraphModal(false)
+  }
+
+  const openSaveModal = () => {
+    setDashboardName('')
+    setShowSaveModal(true)
+  }
+
+  const closeSaveModal = () => {
+    setShowSaveModal(false)
+    setDashboardName('')
+  }
+
+  const handleSaveDashboard = async () => {
+    if (!dashboardName.trim()) {
+      alert('Please enter a dashboard name')
+      return
+    }
+
+    setIsSaving(true)
+
+    // Format the graphs_array according to API spec
+    const graphsArray = savedGraphs.map(graph => ({
+      query: graph.query,
+      graph_type: graph.type,
+      attributes: {
+        x_axis: {
+          key: 'labels',
+          values: graph.data.labels
+        },
+        y_axis: {
+          key: 'values',
+          values: graph.data.values
+        }
+      }
+    }))
+
+    const payload = {
+      user_id: 'current_user_id', // TODO: Get from auth context
+      dashboard_name: dashboardName.trim(),
+      domain_type: category,
+      graphs_array: graphsArray
+    }
+
+    try {
+      const useDemoMode = true
+
+      if (useDemoMode) {
+        // Simulate API call
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        console.log('Save Dashboard Payload:', JSON.stringify(payload, null, 2))
+        alert(`Dashboard "${dashboardName}" saved successfully!`)
+      } else {
+        const response = await fetch('YOUR_SAVE_DASHBOARD_API_ENDPOINT', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+        
+        if (!response.ok) {
+          throw new Error('Failed to save dashboard')
+        }
+        
+        const result = await response.json()
+        alert(`Dashboard "${dashboardName}" saved successfully!`)
+      }
+
+      closeSaveModal()
+      // Optionally clear saved graphs after saving
+      // setSavedGraphs([])
+    } catch (error) {
+      console.error('Error saving dashboard:', error)
+      alert('Error saving dashboard. Please try again.')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  // Mini bar chart component for saved graphs
+  const MiniBarChart = ({ data }) => (
+    <div className="mini-bar-chart">
+      {data.labels.map((label, index) => (
+        <div key={index} className="mini-bar-item">
+          <div 
+            className="mini-bar"
+            style={{
+              height: `${(data.values[index] / Math.max(...data.values)) * 100}%`
+            }}
+          />
+        </div>
+      ))}
+    </div>
+  )
 
   return (
     <div className="query-interface">
-      {/* Sidebar with Category Tabs */}
-      <div className="sidebar">
-        <h3 className="sidebar-title">Categories</h3>
-        <div className="category-tabs">
-          {categories.map((category) => (
-            <button
-              key={category.id}
-              className={`category-tab ${activeCategory === category.id ? 'active' : ''}`}
-              onClick={() => setActiveCategory(category.id)}
-            >
-              <span className="category-icon">{category.icon}</span>
-              <span className="category-name">{category.name}</span>
-            </button>
-          ))}
+      {/* Main Query Panel */}
+      <div className={`query-panel ${savedGraphs.length > 0 ? 'with-sidebar' : ''}`}>
+        <div className="query-panel-header">
+          <span className="query-icon">🔍</span>
+          <h3>Natural Language Query</h3>
         </div>
-      </div>
-
-      {/* Main Query Container */}
-      <div className="query-container">
-        {/* Suggested Questions Section */}
-        <div className="suggested-questions-section">
-          <div className="suggested-header">
-            <span className="suggested-icon">💡</span>
-            <h3>Here are some related questions you can explore:</h3>
-          </div>
-          <div className="suggested-questions-grid">
-            {currentQuestions.map((question, index) => (
-              <button
-                key={index}
-                className="suggested-question-card"
-                onClick={() => sendQuery(question)}
-                disabled={isLoading}
-              >
-                {question}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Dynamic Prompt Tabs */}
-        {promptTabs.length > 0 && (
-          <div className="prompt-tabs">
-            <div className="prompt-tabs-header">Explore Related Questions:</div>
-            <div className="prompt-tabs-container">
-              {promptTabs.map((prompt, index) => (
-                <button
-                  key={index}
-                  className={`prompt-tab ${activePromptTab === index ? 'active' : ''}`}
-                  onClick={() => handlePromptTabClick(prompt, index)}
-                >
-                  {prompt}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Main Content Area */}
-        <div className="main-content-area">
-          {/* Chat Messages */}
-          <div className={`chat-section ${graphData ? 'with-graph' : ''}`}>
-            <div className="chat-messages">
-              {messages.length === 0 ? (
-                <div className="empty-state">
-                  <h3>Start a conversation</h3>
-                  <p>Ask a question in natural language to get started</p>
-                </div>
-              ) : (
-                messages.map((message, index) => (
-                  <div
-                    key={index}
-                    className={`message ${message.role}`}
-                  >
-                    <div className="message-content">
-                      {message.content}
-                    </div>
-                  </div>
-                ))
-              )}
-              {isLoading && (
-                <div className="message assistant">
-                  <div className="message-content loading">
-                    Thinking...
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Input Form */}
-            <form className="input-form" onSubmit={handleSubmit}>
-              <input
-                type="text"
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                placeholder="Ask a question in natural language..."
-                className="query-input"
-                disabled={isLoading}
-              />
-              <button
-                type="submit"
-                className="send-button"
-                disabled={isLoading || !inputValue.trim()}
-              >
-                Send
-              </button>
-            </form>
-          </div>
-
-          {/* Graph Panel */}
-          {graphData && (
-            <div className={`graph-panel ${isGraphMinimized ? 'minimized' : ''}`}>
-              <div className="graph-header">
-                <h4 className="graph-title">{graphData.question}</h4>
-                <button
-                  className="minimize-button"
-                  onClick={() => setIsGraphMinimized(!isGraphMinimized)}
-                >
-                  {isGraphMinimized ? '▲' : '▼'}
-                </button>
+        
+        <div className="chat-messages">
+          {messages.length === 0 ? (
+            <div className="welcome-section">
+              <div className="welcome-message">
+                Welcome to DerivInsight! Ask me anything about your {category} data.
               </div>
-
-              {!isGraphMinimized && (
-                <div className="graph-content">
-                  <div className="graph-visualization">
-                    {/* Simple Bar Chart Visualization */}
-                    <div className="bar-chart">
-                      {graphData.data.labels.map((label, index) => (
-                        <div key={index} className="bar-item">
-                          <div className="bar-wrapper">
-                            <div
-                              className="bar"
-                              style={{
-                                height: `${(graphData.data.values[index] / Math.max(...graphData.data.values)) * 100}%`
-                              }}
-                            >
-                              <span className="bar-value">{graphData.data.values[index]}</span>
-                            </div>
-                          </div>
-                          <span className="bar-label">{label}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <button
-                    className="add-to-dashboard-button"
-                    onClick={handleAddToDashboard}
-                  >
-                    Add to Dashboard
-                  </button>
+              
+              {/* Try These Queries */}
+              <div className="suggestions-inline">
+                <div className="suggestions-header">
+                  <span className="sparkle-icon">✨</span>
+                  <h4>Try These Queries</h4>
                 </div>
-              )}
+                <div className="suggestions-grid">
+                  {suggestedQueries.map((query, index) => (
+                    <button
+                      key={index}
+                      className="suggestion-chip"
+                      onClick={() => sendQuery(query)}
+                      disabled={isLoading}
+                    >
+                      {query}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : (
+            messages.map((message, index) => (
+              <div key={index} className={`message ${message.role}`}>
+                <div className="message-content">{message.content}</div>
+              </div>
+            ))
+          )}
+          {isLoading && (
+            <div className="message assistant">
+              <div className="message-content loading">Thinking...</div>
             </div>
           )}
         </div>
+
+        <form className="input-form" onSubmit={handleSubmit}>
+          <input
+            type="text"
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            placeholder="Ask a question about your data..."
+            className="query-input"
+            disabled={isLoading}
+          />
+          <button type="submit" className="send-button" disabled={isLoading || !inputValue.trim()}>
+            🔍 Query
+          </button>
+        </form>
       </div>
+
+      {/* Saved Graphs Panel */}
+      {savedGraphs.length > 0 && (
+        <div className="saved-graphs-panel">
+          <div className="saved-graphs-header">
+            <span className="chart-icon">📊</span>
+            <h3>Saved Graphs</h3>
+            <span className="graph-count">{savedGraphs.length}</span>
+          </div>
+          <div className="saved-graphs-list">
+            {savedGraphs.map((graph) => (
+              <div key={graph.id} className="saved-graph-card">
+                <div className="saved-graph-header">
+                  <span className="saved-graph-title" title={graph.query}>
+                    {graph.query.length > 30 ? graph.query.substring(0, 30) + '...' : graph.query}
+                  </span>
+                  <button 
+                    className="remove-graph-btn"
+                    onClick={() => handleRemoveGraph(graph.id)}
+                    title="Remove graph"
+                  >
+                    ×
+                  </button>
+                </div>
+                <MiniBarChart data={graph.data} />
+              </div>
+            ))}
+          </div>
+          <div className="saved-graphs-footer">
+            <button className="save-dashboard-btn" onClick={openSaveModal}>
+              💾 Save Dashboard
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Graph Modal Popup */}
+      {showGraphModal && graphData && (
+        <div className="modal-overlay" onClick={closeModal}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h4 className="modal-title">{graphData.query}</h4>
+              <button className="modal-close" onClick={closeModal}>×</button>
+            </div>
+            <div className="modal-body">
+              <div className="graph-visualization">
+                <div className="bar-chart">
+                  {graphData.data.labels.map((label, index) => (
+                    <div key={index} className="bar-item">
+                      <div className="bar-wrapper">
+                        <div
+                          className="bar"
+                          style={{
+                            height: `${(graphData.data.values[index] / Math.max(...graphData.data.values)) * 100}%`
+                          }}
+                        >
+                          <span className="bar-value">{graphData.data.values[index].toLocaleString()}</span>
+                        </div>
+                      </div>
+                      <span className="bar-label">{label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="cancel-button" onClick={closeModal}>
+                Close
+              </button>
+              <button className="add-to-dashboard-button" onClick={handleAddToDashboard}>
+                + Add to Dashboard
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Save Dashboard Modal */}
+      {showSaveModal && (
+        <div className="modal-overlay" onClick={closeSaveModal}>
+          <div className="modal-content save-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h4 className="modal-title">💾 Save Dashboard</h4>
+              <button className="modal-close" onClick={closeSaveModal}>×</button>
+            </div>
+            <div className="modal-body">
+              <div className="save-form">
+                <label className="save-label">Dashboard Name</label>
+                <input
+                  type="text"
+                  className="save-input"
+                  placeholder="Enter dashboard name..."
+                  value={dashboardName}
+                  onChange={(e) => setDashboardName(e.target.value)}
+                  autoFocus
+                />
+                <div className="save-info">
+                  <div className="save-info-row">
+                    <span className="save-info-label">Domain Type:</span>
+                    <span className="save-info-value">{category}</span>
+                  </div>
+                  <div className="save-info-row">
+                    <span className="save-info-label">Graphs:</span>
+                    <span className="save-info-value">{savedGraphs.length} graph(s)</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="cancel-button" onClick={closeSaveModal} disabled={isSaving}>
+                Cancel
+              </button>
+              <button 
+                className="save-confirm-button" 
+                onClick={handleSaveDashboard}
+                disabled={isSaving || !dashboardName.trim()}
+              >
+                {isSaving ? 'Saving...' : 'Save Dashboard'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
