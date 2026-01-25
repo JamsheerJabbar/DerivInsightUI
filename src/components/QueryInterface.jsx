@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import './QueryInterface.css'
 import DynamicChart from './DynamicChart'
 
@@ -14,6 +14,127 @@ function QueryInterface({ category = 'compliance' }) {
   const [showSaveModal, setShowSaveModal] = useState(false)
   const [dashboardName, setDashboardName] = useState('')
   const [isSaving, setIsSaving] = useState(false)
+  
+  // Conversation management state
+  const [conversationId, setConversationId] = useState(null)
+  const [conversationHistory, setConversationHistory] = useState({}) // { category: [{ id, messages, savedGraphs, title, timestamp }] }
+  const [activeConversationIndex, setActiveConversationIndex] = useState(null)
+
+  // Helper to get conversation title from first user message
+  const getConversationTitle = (msgs) => {
+    const firstUserMsg = msgs.find(m => m.role === 'user')
+    if (!firstUserMsg) return 'New Conversation'
+    return firstUserMsg.content.length > 40 
+      ? firstUserMsg.content.substring(0, 40) + '...' 
+      : firstUserMsg.content
+  }
+
+  // Save current conversation to history
+  const saveCurrentConversation = (prevCategory) => {
+    if (messages.length > 0 && conversationId) {
+      setConversationHistory(prev => {
+        const categoryHistory = prev[prevCategory] || []
+        // Check if conversation already exists in history
+        const existingIndex = categoryHistory.findIndex(c => c.id === conversationId)
+        
+        const conversationData = {
+          id: conversationId,
+          messages: messages,
+          savedGraphs: savedGraphs,
+          title: getConversationTitle(messages),
+          timestamp: Date.now()
+        }
+        
+        if (existingIndex >= 0) {
+          // Update existing conversation
+          const updated = [...categoryHistory]
+          updated[existingIndex] = conversationData
+          return { ...prev, [prevCategory]: updated }
+        } else {
+          // Add new conversation
+          return { ...prev, [prevCategory]: [...categoryHistory, conversationData] }
+        }
+      })
+    }
+  }
+
+  // Start a new conversation
+  const startNewConversation = () => {
+    // Save current conversation first
+    if (messages.length > 0 && conversationId) {
+      saveCurrentConversation(category)
+    }
+    
+    const newId = crypto.randomUUID()
+    setConversationId(newId)
+    setMessages([])
+    setSavedGraphs([])
+    setActiveConversationIndex(null)
+    setInputValue('')
+    setGraphData(null)
+    setShowGraphModal(false)
+  }
+
+  // Load a conversation from history
+  const loadConversation = (conversation, index) => {
+    // Save current conversation before loading another
+    if (messages.length > 0 && conversationId) {
+      saveCurrentConversation(category)
+    }
+    
+    setConversationId(conversation.id)
+    setMessages(conversation.messages)
+    setSavedGraphs(conversation.savedGraphs || [])
+    setActiveConversationIndex(index)
+    setInputValue('')
+    setGraphData(null)
+    setShowGraphModal(false)
+  }
+
+  // Handle category changes - save current and reset for new category
+  useEffect(() => {
+    // Save current conversation before switching (need to track previous category)
+    return () => {
+      // Cleanup is handled by the next effect
+    }
+  }, [])
+
+  // Track previous category for saving
+  const [prevCategory, setPrevCategory] = useState(category)
+  
+  useEffect(() => {
+    if (prevCategory !== category) {
+      // Save conversation from previous category
+      if (messages.length > 0 && conversationId) {
+        saveCurrentConversation(prevCategory)
+      }
+      
+      // Reset for new category
+      setMessages([])
+      setInputValue('')
+      setIsLoading(false)
+      setShowChartTypeModal(false)
+      setSelectedChartType(null)
+      setGraphData(null)
+      setShowGraphModal(false)
+      setSavedGraphs([])
+      setShowSaveModal(false)
+      setDashboardName('')
+      
+      // Start fresh conversation for new category
+      setConversationId(crypto.randomUUID())
+      setActiveConversationIndex(null)
+      
+      setPrevCategory(category)
+    }
+  }, [category, prevCategory, messages, conversationId, savedGraphs])
+
+  // Initialize conversation ID on mount
+  useEffect(() => {
+    if (!conversationId) {
+      setConversationId(crypto.randomUUID())
+    }
+  }, [])
 
   // Category-based suggested queries
   const categorizedQueries = {
@@ -98,9 +219,45 @@ function QueryInterface({ category = 'compliance' }) {
   function transformChartData(results, visualizationConfig) {
     const { x_axis_key, y_axis_key } = visualizationConfig;
 
+    // Handle x_axis_key - can be a string or array of strings
+    const xKeys = Array.isArray(x_axis_key) ? x_axis_key : [x_axis_key];
+    // Handle y_axis_key - can be a string or array of strings
+    const yKeys = Array.isArray(y_axis_key) ? y_axis_key : [y_axis_key];
+
+    // Build labels (x-axis values)
+    // If multiple x keys, combine them or keep as array for table display
+    let labels;
+    if (xKeys.length === 1) {
+      labels = results.map(item => item[xKeys[0]]);
+    } else {
+      // Multiple x columns - for tables, keep as objects; for charts, combine
+      labels = results.map(item => 
+        xKeys.map(key => item[key])
+      );
+    }
+
+    // Build datasets (y-axis values)
+    // If single y key, keep simple structure for backward compatibility
+    if (yKeys.length === 1) {
+      return {
+        labels,
+        values: results.map(item => item[yKeys[0]]),
+        xKeys,
+        yKeys
+      };
+    }
+
+    // Multiple y keys - create datasets array for multi-series charts
+    const datasets = yKeys.map(key => ({
+      label: key,
+      values: results.map(item => item[key])
+    }));
+
     return {
-      labels: results.map(item => item[x_axis_key]),
-      values: results.map(item => item[y_axis_key])
+      labels,
+      datasets,
+      xKeys,
+      yKeys
     };
   }
 
@@ -116,7 +273,8 @@ function QueryInterface({ category = 'compliance' }) {
       const useDemoMode = false
 
       let data
-      const conversation_id = crypto.randomUUID();
+      // Use the persistent conversation_id from state
+      const conversation_id = conversationId;
       if (useDemoMode) {
         await new Promise(resolve => setTimeout(resolve, 1000))
         
@@ -195,6 +353,7 @@ function QueryInterface({ category = 'compliance' }) {
     const finalGraph = {
       ...graphData,
       id: crypto.randomUUID(),
+      conversationId: conversationId, // Track which conversation this graph belongs to
     };
 
     setSavedGraphs(prev => [...prev, finalGraph]);
@@ -228,20 +387,29 @@ function QueryInterface({ category = 'compliance' }) {
     setIsSaving(true)
 
     // Format the graphs_array according to API spec
-    const graphsArray = savedGraphs.map(graph => ({
-      query: graph.query,
-      graphType: graph.type,
-      attributes: {
-        xAxis: {
-          key: 'labels',
-          values: graph.data.labels
-        },
-        yAxis: {
-          key: 'values',
-          values: graph.data.values
+    const graphsArray = savedGraphs.map(graph => {
+      const hasMultipleDatasets = graph.data.datasets && Array.isArray(graph.data.datasets);
+      
+      return {
+        query: graph.query,
+        graphType: graph.type,
+        attributes: {
+          xAxis: {
+            keys: graph.data.xKeys || ['labels'],
+            values: graph.data.labels
+          },
+          yAxis: hasMultipleDatasets 
+            ? {
+                keys: graph.data.yKeys || graph.data.datasets.map(ds => ds.label),
+                datasets: graph.data.datasets
+              }
+            : {
+                keys: graph.data.yKeys || ['values'],
+                values: graph.data.values
+              }
         }
-      }
-    }))
+      };
+    })
 
     const payload = {
       userId: 'current_user_id', // TODO: Get from auth context
@@ -303,10 +471,17 @@ function QueryInterface({ category = 'compliance' }) {
   return (
     <div className="query-interface">
       {/* Main Query Panel */}
-      <div className={`query-panel ${savedGraphs.length > 0 ? 'with-sidebar' : ''}`}>
+      <div className={`query-panel ${savedGraphs.length > 0 ? 'with-sidebar' : ''} ${conversationHistory[category]?.length > 0 ? 'with-history' : ''}`}>
         <div className="query-panel-header">
           <span className="query-icon">🔍</span>
           <h3>Natural Language Query</h3>
+          <button 
+            className="new-conversation-btn"
+            onClick={startNewConversation}
+            title="Start new conversation"
+          >
+            + New
+          </button>
         </div>
         
         <div className="chat-messages">
@@ -399,6 +574,37 @@ function QueryInterface({ category = 'compliance' }) {
             <button className="save-dashboard-btn" onClick={openSaveModal}>
               💾 Save Dashboard
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Conversation History Sidebar */}
+      {conversationHistory[category] && conversationHistory[category].length > 0 && (
+        <div className="conversation-history-panel">
+          <div className="conversation-history-header">
+            <span className="history-icon">💬</span>
+            <h3>Chat History</h3>
+            <span className="history-count">{conversationHistory[category].length}</span>
+          </div>
+          <div className="conversation-history-list">
+            {conversationHistory[category].map((conv, index) => (
+              <button
+                key={conv.id}
+                className={`conversation-history-item ${conv.id === conversationId ? 'active' : ''}`}
+                onClick={() => loadConversation(conv, index)}
+                title={conv.title}
+              >
+                <div className="history-item-content">
+                  <span className="history-item-title">{conv.title}</span>
+                  <span className="history-item-time">
+                    {new Date(conv.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
+                {conv.savedGraphs && conv.savedGraphs.length > 0 && (
+                  <span className="history-item-badge">{conv.savedGraphs.length} 📊</span>
+                )}
+              </button>
+            ))}
           </div>
         </div>
       )}
