@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import './Dashboard.css'
+import DashboardChart from './DashboardChart'
 
 function Dashboard() {
   const [dashboards, setDashboards] = useState([])
@@ -40,9 +41,9 @@ function Dashboard() {
   const fetchDashboards = async () => {
     setIsLoadingList(true)
     try {
-      const useDemoMode = true
+      const useDemoMode4 = false
 
-      if (useDemoMode) {
+      if (useDemoMode4) {
         await new Promise(resolve => setTimeout(resolve, 800))
         
         const mockDashboards = [
@@ -57,7 +58,7 @@ function Dashboard() {
         ]
         setDashboards(mockDashboards)
       } else {
-        const response = await fetch('YOUR_GET_DASHBOARDS_API_ENDPOINT', {
+        const response = await fetch('http://localhost:9999/api/v1/dashboards', {
           method: 'GET',
           headers: { 'Content-Type': 'application/json' },
         })
@@ -74,12 +75,12 @@ function Dashboard() {
   const fetchDashboardDetails = async (dashboardId) => {
     setIsLoadingDashboard(true)
     try {
-      const useDemoMode = true
+      const useDemoMode3 = false
 
-      if (useDemoMode) {
+      if (useDemoMode3) {
         await new Promise(resolve => setTimeout(resolve, 600))
         
-        const dashboard = dashboards.find(d => d.id === dashboardId)
+        const dashboard = dashboards.find(d => d.dashboardId === dashboardId)
         
         const mockDetails = {
           id: dashboardId,
@@ -114,7 +115,7 @@ function Dashboard() {
         }
         setSelectedDashboard(mockDetails)
       } else {
-        const response = await fetch(`YOUR_FETCH_DASHBOARD_API_ENDPOINT/${dashboardId}`, {
+        const response = await fetch(`http://localhost:9999/api/v1/dashboards/${dashboardId}`, {
           method: 'GET',
           headers: { 'Content-Type': 'application/json' },
         })
@@ -319,7 +320,7 @@ function Dashboard() {
   }
 
   // Filter dashboards by active category
-  const filteredDashboards = dashboards.filter(d => d.domain_type === activeCategory)
+  const filteredDashboards = dashboards
 
   // Render dashboard list view
   if (!selectedDashboard) {
@@ -359,13 +360,12 @@ function Dashboard() {
           <div className="dashboards-grid">
             {filteredDashboards.map((dashboard) => (
               <div
-                key={dashboard.id}
+                key={dashboard.dashboardId}
                 className="dashboard-tile"
-                onClick={() => handleDashboardClick(dashboard.id)}
+                onClick={() => handleDashboardClick(dashboard.dashboardId)}
               >
                 <div className="tile-content">
-                  <h3 className="tile-name">{dashboard.name}</h3>
-                  <span className="tile-date">{dashboard.created_at}</span>
+                  <h3 className="tile-name">{dashboard.dashboardName}</h3>
                 </div>
                 <span className="tile-arrow">›</span>
               </div>
@@ -401,31 +401,15 @@ function Dashboard() {
           {/* Graphs Section */}
           <div className="graphs-section">
             <div className="graphs-grid">
-              {selectedDashboard.graphs_array?.map((graph, index) => (
+              {selectedDashboard.graphsArray?.map((graph, index) => (
                 <div key={index} className="graph-card">
                   <div className="graph-card-header">
                     <h4 className="graph-card-title">{graph.query}</h4>
-                    <span className="graph-type-badge">{graph.graph_type}</span>
+                    <span className="graph-type-badge">{graph.graphType}</span>
                   </div>
                   <div className="graph-card-body">
-                    <div className="dashboard-bar-chart">
-                      {graph.attributes.x_axis.values.map((label, i) => (
-                        <div key={i} className="dashboard-bar-item">
-                          <div className="dashboard-bar-wrapper">
-                            <div
-                              className="dashboard-bar"
-                              style={{
-                                height: `${(graph.attributes.y_axis.values[i] / Math.max(...graph.attributes.y_axis.values)) * 100}%`
-                              }}
-                            >
-                              <span className="dashboard-bar-value">
-                                {graph.attributes.y_axis.values[i].toLocaleString()}
-                              </span>
-                            </div>
-                          </div>
-                          <span className="dashboard-bar-label">{label}</span>
-                        </div>
-                      ))}
+                    <div className="graph-card-body">
+                      <DashboardChart graph={graph} />
                     </div>
                   </div>
                 </div>

@@ -1,10 +1,13 @@
 import { useState } from 'react'
 import './QueryInterface.css'
+import DynamicChart from './DynamicChart'
 
 function QueryInterface({ category = 'compliance' }) {
   const [messages, setMessages] = useState([])
   const [inputValue, setInputValue] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [showChartTypeModal, setShowChartTypeModal] = useState(false);
+  const [selectedChartType, setSelectedChartType] = useState(null);
   const [graphData, setGraphData] = useState(null)
   const [showGraphModal, setShowGraphModal] = useState(false)
   const [savedGraphs, setSavedGraphs] = useState([])
@@ -43,6 +46,16 @@ function QueryInterface({ category = 'compliance' }) {
     ]
   }
 
+  const CHART_TYPES = [
+    { key: "bar", label: "Bar Chart" },
+    { key: "line", label: "Line Chart" },
+    { key: "pie", label: "Pie Chart" },
+    { key: "doughnut", label: "Doughnut Chart" },
+    { key: "scatter", label: "Scatter Plot" },
+    { key: "table", label: "Table" },
+  ];
+
+
   const suggestedQueries = categorizedQueries[category] || categorizedQueries.compliance
 
   const generateMockGraphData = (query) => {
@@ -76,10 +89,19 @@ function QueryInterface({ category = 'compliance' }) {
       return mockDataSets.users
     } else if (queryLower.includes('risk') || queryLower.includes('flag')) {
       return mockDataSets.risk
-    } else if (queryLower.includes('country') || queryLower.includes('region')) {
+    } else if (queryLower.infcludes('country') || queryLower.includes('region')) {
       return mockDataSets.countries
     }
     return mockDataSets.revenue
+  }
+
+  function transformChartData(results, visualizationConfig) {
+    const { x_axis_key, y_axis_key } = visualizationConfig;
+
+    return {
+      labels: results.map(item => item[x_axis_key]),
+      values: results.map(item => item[y_axis_key])
+    };
   }
 
   const sendQuery = async (query) => {
@@ -91,9 +113,10 @@ function QueryInterface({ category = 'compliance' }) {
     setIsLoading(true)
 
     try {
-      const useDemoMode = true
+      const useDemoMode = false
 
       let data
+      const conversation_id = crypto.randomUUID();
       if (useDemoMode) {
         await new Promise(resolve => setTimeout(resolve, 1000))
         
@@ -118,27 +141,37 @@ function QueryInterface({ category = 'compliance' }) {
           }
         }
       } else {
-        const response = await fetch('YOUR_API_ENDPOINT', {
+        const response = await fetch('http://localhost:9898/api/v1/query', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query, category }),
+          body: JSON.stringify({ query, conversation_id}),
         })
         data = await response.json()
+      }
+      var display_content = ""
+      if(data.is_final === true){
+        display_content = data.visualization_config.description
+      } else {
+        display_content = data.clarification_question
       }
 
       const assistantMessage = {
         role: 'assistant',
-        content: data.questions || 'Query processed.'
+        content: display_content
       }
       setMessages(prev => [...prev, assistantMessage])
 
-      if (data.is_final === true) {
+      if (data.is_final === true && data.visualization_config.x_axis_key !== null && data.visualization_config.y_axis_key !== null) {
         setGraphData({
-          id: Date.now(),
+          id: conversation_id,
           query: query,
-          data: data.graph_data || generateMockGraphData(query),
-          type: data.graph_type || 'bar'
+          description: data.visualization_config.description,
+          data: transformChartData(data.results, data.visualization_config),
+          recommendedType: data.visualization_config.chart_type || 'bar',
+          type: data.visualization_config.chart_type || 'bar'
         })
+        setSelectedChartType(graphData.type); // recommended type
+        console.log('Graph Data = ', graphData);
         setShowGraphModal(true)
       }
     } catch (error) {
@@ -159,11 +192,14 @@ function QueryInterface({ category = 'compliance' }) {
   }
 
   const handleAddToDashboard = () => {
-    if (graphData) {
-      setSavedGraphs(prev => [...prev, { ...graphData, id: Date.now() }])
-      setShowGraphModal(false)
-    }
-  }
+    const finalGraph = {
+      ...graphData,
+      id: crypto.randomUUID(),
+    };
+
+    setSavedGraphs(prev => [...prev, finalGraph]);
+    closeModal();
+  };
 
   const handleRemoveGraph = (graphId) => {
     setSavedGraphs(prev => prev.filter(g => g.id !== graphId))
@@ -194,13 +230,13 @@ function QueryInterface({ category = 'compliance' }) {
     // Format the graphs_array according to API spec
     const graphsArray = savedGraphs.map(graph => ({
       query: graph.query,
-      graph_type: graph.type,
+      graphType: graph.type,
       attributes: {
-        x_axis: {
+        xAxis: {
           key: 'labels',
           values: graph.data.labels
         },
-        y_axis: {
+        yAxis: {
           key: 'values',
           values: graph.data.values
         }
@@ -208,22 +244,22 @@ function QueryInterface({ category = 'compliance' }) {
     }))
 
     const payload = {
-      user_id: 'current_user_id', // TODO: Get from auth context
-      dashboard_name: dashboardName.trim(),
-      domain_type: category,
-      graphs_array: graphsArray
+      userId: 'current_user_id', // TODO: Get from auth context
+      dashboardName: dashboardName.trim(),
+      domainType: category,
+      graphsArray: graphsArray
     }
 
     try {
-      const useDemoMode = true
+      const useDemoMode2 = false
 
-      if (useDemoMode) {
+      if (useDemoMode2) {
         // Simulate API call
         await new Promise(resolve => setTimeout(resolve, 1000))
         console.log('Save Dashboard Payload:', JSON.stringify(payload, null, 2))
         alert(`Dashboard "${dashboardName}" saved successfully!`)
       } else {
-        const response = await fetch('YOUR_SAVE_DASHBOARD_API_ENDPOINT', {
+        const response = await fetch('http://localhost:9999/api/v1/dashboards', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
@@ -352,7 +388,10 @@ function QueryInterface({ category = 'compliance' }) {
                     ×
                   </button>
                 </div>
-                <MiniBarChart data={graph.data} />
+                <DynamicChart
+                  type={graph.type || "bar"}
+                  data={graph.data}
+                />
               </div>
             ))}
           </div>
@@ -372,27 +411,42 @@ function QueryInterface({ category = 'compliance' }) {
               <h4 className="modal-title">{graphData.query}</h4>
               <button className="modal-close" onClick={closeModal}>×</button>
             </div>
+
             <div className="modal-body">
               <div className="graph-visualization">
-                <div className="bar-chart">
-                  {graphData.data.labels.map((label, index) => (
-                    <div key={index} className="bar-item">
-                      <div className="bar-wrapper">
-                        <div
-                          className="bar"
-                          style={{
-                            height: `${(graphData.data.values[index] / Math.max(...graphData.data.values)) * 100}%`
-                          }}
-                        >
-                          <span className="bar-value">{graphData.data.values[index].toLocaleString()}</span>
-                        </div>
-                      </div>
-                      <span className="bar-label">{label}</span>
-                    </div>
-                  ))}
-                </div>
+                <DynamicChart
+                  type={graphData.type}
+                  data={graphData.data}
+                />
+              </div>
+
+              {/* 🔥 Chart Type Switcher */}
+              <div className="chart-type-switcher">
+                {["bar", "line", "pie", "doughnut", "scatter", "table"].map((type) => {
+                  const isActive = graphData.type === type;
+                  const isRecommended = graphData.recommendedType === type;
+
+                  return (
+                    <button
+                      key={type}
+                      className={`chart-type-btn ${isActive ? "active" : ""}`}
+                      onClick={() =>
+                        setGraphData(prev => ({
+                          ...prev,
+                          type
+                        }))
+                      }
+                    >
+                      {type}
+                      {isRecommended && (
+                        <span className="recommended-dot">●</span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </div>
+
             <div className="modal-footer">
               <button className="cancel-button" onClick={closeModal}>
                 Close
@@ -404,6 +458,7 @@ function QueryInterface({ category = 'compliance' }) {
           </div>
         </div>
       )}
+
 
       {/* Save Dashboard Modal */}
       {showSaveModal && (
