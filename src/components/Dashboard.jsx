@@ -8,7 +8,7 @@ function Dashboard() {
   const [isLoadingList, setIsLoadingList] = useState(true)
   const [isLoadingDashboard, setIsLoadingDashboard] = useState(false)
   const [activeCategory, setActiveCategory] = useState('compliance')
-  
+
   // Chat assistant state
   const [chatMessages, setChatMessages] = useState([])
   const [chatInput, setChatInput] = useState('')
@@ -45,7 +45,7 @@ function Dashboard() {
 
       if (useDemoMode4) {
         await new Promise(resolve => setTimeout(resolve, 800))
-        
+
         const mockDashboards = [
           { id: 'dash_001', name: 'Compliance Overview', domain_type: 'compliance', created_at: '2026-01-15' },
           { id: 'dash_002', name: 'Regulatory Status Report', domain_type: 'compliance', created_at: '2026-01-14' },
@@ -58,7 +58,7 @@ function Dashboard() {
         ]
         setDashboards(mockDashboards)
       } else {
-        const response = await fetch('http://localhost:9999/api/v1/dashboards', {
+        const response = await fetch('http://localhost:8080/api/v1/dashboards', {
           method: 'GET',
           headers: { 'Content-Type': 'application/json' },
         })
@@ -79,9 +79,9 @@ function Dashboard() {
 
       if (useDemoMode3) {
         await new Promise(resolve => setTimeout(resolve, 600))
-        
+
         const dashboard = dashboards.find(d => d.dashboardId === dashboardId)
-        
+
         const mockDetails = {
           id: dashboardId,
           name: dashboard?.name || 'Dashboard',
@@ -115,7 +115,7 @@ function Dashboard() {
         }
         setSelectedDashboard(mockDetails)
       } else {
-        const response = await fetch(`http://localhost:9999/api/v1/dashboards/${dashboardId}`, {
+        const response = await fetch(`http://localhost:8080/api/v1/dashboards/${dashboardId}`, {
           method: 'GET',
           headers: { 'Content-Type': 'application/json' },
         })
@@ -152,13 +152,13 @@ function Dashboard() {
     if (codeBlockMatch) {
       return codeBlockMatch[1].trim()
     }
-    
+
     // Try to find SQL pattern
     const sqlMatch = text.match(/(SELECT[\s\S]*?;)/i)
     if (sqlMatch) {
       return sqlMatch[1].trim()
     }
-    
+
     return text
   }
 
@@ -178,7 +178,7 @@ function Dashboard() {
       if (useDemoMode) {
         await new Promise(resolve => setTimeout(resolve, 1000))
         console.log('Create Alert Payload:', JSON.stringify(payload, null, 2))
-        
+
         setChatMessages(prev => [...prev, {
           role: 'system',
           content: `✅ Alert "${alertName}" created successfully! The system will now monitor for anomalies based on the configured query.`
@@ -189,11 +189,11 @@ function Dashboard() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         })
-        
+
         if (!response.ok) {
           throw new Error('Failed to create alert')
         }
-        
+
         const result = await response.json()
         setChatMessages(prev => [...prev, {
           role: 'system',
@@ -226,9 +226,9 @@ function Dashboard() {
       let data
       if (useDemoMode) {
         await new Promise(resolve => setTimeout(resolve, 1200))
-        
+
         const msgLower = message.toLowerCase()
-        
+
         // Simulate conversation flow
         if (msgLower.includes('alert') && (msgLower.includes('create') || msgLower.includes('set up') || msgLower.includes('configure'))) {
           data = {
@@ -254,10 +254,10 @@ function Dashboard() {
           // Extract alert name from message
           const nameMatch = message.match(/["']([^"']+)["']/) || message.match(/name[:\s]+(\w[\w\s]+)/i)
           const alertName = nameMatch ? nameMatch[1].trim() : 'Anomaly Alert ' + Date.now()
-          
+
           // Find the last SQL query in chat
           const lastSqlMessage = [...chatMessages].reverse().find(m => m.sql_query)
-          
+
           if (lastSqlMessage?.sql_query) {
             data = {
               response: `Creating alert "${alertName}"...`,
@@ -328,7 +328,7 @@ function Dashboard() {
       <div className="dashboard-container">
         <div className="dashboard-header">
           <h2>📊 My Dashboards</h2>
-          
+
           <div className="dashboard-category-tabs">
             {categories.map((cat) => (
               <button
@@ -423,7 +423,7 @@ function Dashboard() {
               <span className="assistant-icon">🤖</span>
               <h3>Anomaly Detection Assistant</h3>
             </div>
-            
+
             <div className="chat-assistant-messages">
               {chatMessages.length === 0 ? (
                 <div className="chat-welcome">
@@ -475,8 +475,8 @@ function Dashboard() {
                 className="chat-input"
                 disabled={isChatLoading || isCreatingAlert}
               />
-              <button 
-                type="submit" 
+              <button
+                type="submit"
                 className="chat-send-btn"
                 disabled={isChatLoading || isCreatingAlert || !chatInput.trim()}
               >

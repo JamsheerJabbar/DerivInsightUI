@@ -14,7 +14,7 @@ function QueryInterface({ category = 'compliance' }) {
   const [showSaveModal, setShowSaveModal] = useState(false)
   const [dashboardName, setDashboardName] = useState('')
   const [isSaving, setIsSaving] = useState(false)
-  
+
   // Conversation management state
   const [conversationId, setConversationId] = useState(null)
   const [conversationHistory, setConversationHistory] = useState({}) // { category: [{ id, messages, savedGraphs, title, timestamp }] }
@@ -24,8 +24,8 @@ function QueryInterface({ category = 'compliance' }) {
   const getConversationTitle = (msgs) => {
     const firstUserMsg = msgs.find(m => m.role === 'user')
     if (!firstUserMsg) return 'New Conversation'
-    return firstUserMsg.content.length > 40 
-      ? firstUserMsg.content.substring(0, 40) + '...' 
+    return firstUserMsg.content.length > 40
+      ? firstUserMsg.content.substring(0, 40) + '...'
       : firstUserMsg.content
   }
 
@@ -36,7 +36,7 @@ function QueryInterface({ category = 'compliance' }) {
         const categoryHistory = prev[prevCategory] || []
         // Check if conversation already exists in history
         const existingIndex = categoryHistory.findIndex(c => c.id === conversationId)
-        
+
         const conversationData = {
           id: conversationId,
           messages: messages,
@@ -44,7 +44,7 @@ function QueryInterface({ category = 'compliance' }) {
           title: getConversationTitle(messages),
           timestamp: Date.now()
         }
-        
+
         if (existingIndex >= 0) {
           // Update existing conversation
           const updated = [...categoryHistory]
@@ -64,7 +64,7 @@ function QueryInterface({ category = 'compliance' }) {
     if (messages.length > 0 && conversationId) {
       saveCurrentConversation(category)
     }
-    
+
     const newId = crypto.randomUUID()
     setConversationId(newId)
     setMessages([])
@@ -81,7 +81,7 @@ function QueryInterface({ category = 'compliance' }) {
     if (messages.length > 0 && conversationId) {
       saveCurrentConversation(category)
     }
-    
+
     setConversationId(conversation.id)
     setMessages(conversation.messages)
     setSavedGraphs(conversation.savedGraphs || [])
@@ -101,14 +101,14 @@ function QueryInterface({ category = 'compliance' }) {
 
   // Track previous category for saving
   const [prevCategory, setPrevCategory] = useState(category)
-  
+
   useEffect(() => {
     if (prevCategory !== category) {
       // Save conversation from previous category
       if (messages.length > 0 && conversationId) {
         saveCurrentConversation(prevCategory)
       }
-      
+
       // Reset for new category
       setMessages([])
       setInputValue('')
@@ -120,11 +120,11 @@ function QueryInterface({ category = 'compliance' }) {
       setSavedGraphs([])
       setShowSaveModal(false)
       setDashboardName('')
-      
+
       // Start fresh conversation for new category
       setConversationId(crypto.randomUUID())
       setActiveConversationIndex(null)
-      
+
       setPrevCategory(category)
     }
   }, [category, prevCategory, messages, conversationId, savedGraphs])
@@ -231,7 +231,7 @@ function QueryInterface({ category = 'compliance' }) {
       labels = results.map(item => item[xKeys[0]]);
     } else {
       // Multiple x columns - for tables, keep as objects; for charts, combine
-      labels = results.map(item => 
+      labels = results.map(item =>
         xKeys.map(key => item[key])
       );
     }
@@ -277,13 +277,13 @@ function QueryInterface({ category = 'compliance' }) {
       const conversation_id = conversationId;
       if (useDemoMode) {
         await new Promise(resolve => setTimeout(resolve, 1000))
-        
+
         const queryLower = query.toLowerCase()
-        const isFinalQuery = queryLower.includes('show') || 
-                            queryLower.includes('display') || 
-                            queryLower.includes('graph') ||
-                            queryLower.includes('yes') ||
-                            queryLower.includes('confirm')
+        const isFinalQuery = queryLower.includes('show') ||
+          queryLower.includes('display') ||
+          queryLower.includes('graph') ||
+          queryLower.includes('yes') ||
+          queryLower.includes('confirm')
 
         if (isFinalQuery) {
           data = {
@@ -299,15 +299,15 @@ function QueryInterface({ category = 'compliance' }) {
           }
         }
       } else {
-        const response = await fetch('http://localhost:9898/api/v1/query', {
+        const response = await fetch('http://localhost:8080/api/v1/query', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query, conversation_id}),
+          body: JSON.stringify({ query, conversation_id }),
         })
         data = await response.json()
       }
       var display_content = ""
-      if(data.is_final === true){
+      if (data.is_final === true) {
         display_content = data.visualization_config.description
       } else {
         display_content = data.clarification_question
@@ -333,7 +333,7 @@ function QueryInterface({ category = 'compliance' }) {
         setShowGraphModal(true)
       }
     } catch (error) {
-      console.error('Error calling API:', error)
+      console.log('Error calling API:', error)
       const errorMessage = {
         role: 'assistant',
         content: 'Error: Unable to process your request. Please try again.'
@@ -389,7 +389,7 @@ function QueryInterface({ category = 'compliance' }) {
     // Format the graphs_array according to API spec
     const graphsArray = savedGraphs.map(graph => {
       const hasMultipleDatasets = graph.data.datasets && Array.isArray(graph.data.datasets);
-      
+
       return {
         query: graph.query,
         graphType: graph.type,
@@ -398,15 +398,15 @@ function QueryInterface({ category = 'compliance' }) {
             keys: graph.data.xKeys || ['labels'],
             values: graph.data.labels
           },
-          yAxis: hasMultipleDatasets 
+          yAxis: hasMultipleDatasets
             ? {
-                keys: graph.data.yKeys || graph.data.datasets.map(ds => ds.label),
-                datasets: graph.data.datasets
-              }
+              keys: graph.data.yKeys || graph.data.datasets.map(ds => ds.label),
+              datasets: graph.data.datasets
+            }
             : {
-                keys: graph.data.yKeys || ['values'],
-                values: graph.data.values
-              }
+              keys: graph.data.yKeys || ['values'],
+              values: graph.data.values
+            }
         }
       };
     })
@@ -427,16 +427,16 @@ function QueryInterface({ category = 'compliance' }) {
         console.log('Save Dashboard Payload:', JSON.stringify(payload, null, 2))
         alert(`Dashboard "${dashboardName}" saved successfully!`)
       } else {
-        const response = await fetch('http://localhost:9999/api/v1/dashboards', {
+        const response = await fetch('http://localhost:8080/api/v1/dashboards', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         })
-        
+
         if (!response.ok) {
           throw new Error('Failed to save dashboard')
         }
-        
+
         const result = await response.json()
         alert(`Dashboard "${dashboardName}" saved successfully!`)
       }
@@ -457,7 +457,7 @@ function QueryInterface({ category = 'compliance' }) {
     <div className="mini-bar-chart">
       {data.labels.map((label, index) => (
         <div key={index} className="mini-bar-item">
-          <div 
+          <div
             className="mini-bar"
             style={{
               height: `${(data.values[index] / Math.max(...data.values)) * 100}%`
@@ -475,7 +475,7 @@ function QueryInterface({ category = 'compliance' }) {
         <div className="query-panel-header">
           <span className="query-icon">🔍</span>
           <h3>Natural Language Query</h3>
-          <button 
+          <button
             className="new-conversation-btn"
             onClick={startNewConversation}
             title="Start new conversation"
@@ -483,14 +483,14 @@ function QueryInterface({ category = 'compliance' }) {
             + New
           </button>
         </div>
-        
+
         <div className="chat-messages">
           {messages.length === 0 ? (
             <div className="welcome-section">
               <div className="welcome-message">
                 Welcome to DerivInsight! Ask me anything about your {category} data.
               </div>
-              
+
               {/* Try These Queries */}
               <div className="suggestions-inline">
                 <div className="suggestions-header">
@@ -555,7 +555,7 @@ function QueryInterface({ category = 'compliance' }) {
                   <span className="saved-graph-title" title={graph.query}>
                     {graph.query.length > 30 ? graph.query.substring(0, 30) + '...' : graph.query}
                   </span>
-                  <button 
+                  <button
                     className="remove-graph-btn"
                     onClick={() => handleRemoveGraph(graph.id)}
                     title="Remove graph"
@@ -701,8 +701,8 @@ function QueryInterface({ category = 'compliance' }) {
               <button className="cancel-button" onClick={closeSaveModal} disabled={isSaving}>
                 Cancel
               </button>
-              <button 
-                className="save-confirm-button" 
+              <button
+                className="save-confirm-button"
                 onClick={handleSaveDashboard}
                 disabled={isSaving || !dashboardName.trim()}
               >
