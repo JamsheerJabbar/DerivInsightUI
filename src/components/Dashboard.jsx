@@ -184,7 +184,7 @@ function Dashboard() {
           content: `✅ Alert "${alertName}" created successfully! The system will now monitor for anomalies based on the configured query.`
         }])
       } else {
-        const response = await fetch('YOUR_CREATE_ALERT_API_ENDPOINT', {
+        const response = await fetch('http://localhost:8080/api/v1/query', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
@@ -221,7 +221,7 @@ function Dashboard() {
     setIsChatLoading(true)
 
     try {
-      const useDemoMode = true
+      const useDemoMode = false
 
       let data
       if (useDemoMode) {
@@ -278,7 +278,7 @@ function Dashboard() {
           }
         }
       } else {
-        const response = await fetch('YOUR_CHAT_API_ENDPOINT', {
+        const response = await fetch('http://localhost:8080/api/v1/query', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
