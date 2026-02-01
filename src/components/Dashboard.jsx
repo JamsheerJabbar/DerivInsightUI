@@ -282,9 +282,8 @@ function Dashboard() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            message,
-            dashboard_id: selectedDashboard.id,
-            domain_type: selectedDashboard.domain_type,
+            query: message,
+            domain: selectedDashboard.domain_type,
             conversation_history: chatMessages
           }),
         })
